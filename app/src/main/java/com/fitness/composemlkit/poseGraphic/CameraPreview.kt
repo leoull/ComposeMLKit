@@ -2,7 +2,6 @@ package com.fitness.composemlkit.poseGraphic
 
 import android.content.Context
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.CameraSelector.LENS_FACING_BACK
 import androidx.camera.core.CameraSelector.LENS_FACING_FRONT
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
@@ -11,8 +10,6 @@ import androidx.camera.mlkit.vision.MlKitAnalyzer
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
@@ -36,7 +32,7 @@ import java.util.concurrent.ExecutorService
 fun PoseGraphic(
     poseDetector: PoseDetector,
     classificationExecutor: Executor,
-    cameraExecutor: ExecutorService // TODO not used
+    cameraExecutor: ExecutorService
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -54,34 +50,40 @@ fun PoseGraphic(
         pose = it.getValue(poseDetector)
     }
 
-    val imageAnalyzer = ImageAnalysis.Analyzer { imgProxy ->
-        poseDetector.process(imgProxy.image!!, imgProxy.imageInfo.rotationDegrees)
+    val imageAnalyzer = ImageAnalysis.Analyzer { imageProxy ->
+        poseDetector.process(imageProxy.image!!, imageProxy.imageInfo.rotationDegrees)
             .continueWith(classificationExecutor) { poseTask ->
                 pose = poseTask.result
+
 
                 // reason for width/height calculation: https://stackoverflow.com/questions/63902317/camerax-image-analysiss-imageproxy-size-and-previewview-size-are-not-the-same
                 // width/height calculation: https://github.com/husaynhakeem/android-playground/blob/master/FaceDetectorSample/app/src/main/java/com/husaynhakeem/facedetectorsample/AnalysisFaceDetector.kt
                 // In order to correctly display the face bounds, the orientation of the analyzed
                 // image and that of the viewfinder have to match. Which is why the dimensions of
                 // the analyzed image are reversed if its rotation information is 90 or 270.
-                val rotation = imgProxy.imageInfo.rotationDegrees
+                val rotation = imageProxy.imageInfo.rotationDegrees
                 val reverseDimens = rotation == 90 || rotation == 270
-                imgSize = if (reverseDimens) Pair(imgProxy.height, imgProxy.width)
-                else Pair(imgProxy.width, imgProxy.height)
+                imgSize = if (reverseDimens) Pair(imageProxy.height, imageProxy.width)
+                else Pair(imageProxy.width, imageProxy.height)
+                // TODO retrieve the image resolution width and height outside of this block
+                // TODo retrieving it from the imageProxy is updating the imgSize for every callback of this block
 
-                imgProxy.close()
+                // The proxy has to be closed so the next image frame can be processed
+                imageProxy.close()
             }
     }
 
     // setup Image Analyzer using
     val imageAnalysisBuilder = ImageAnalysis.Builder()
-        //.setTargetResolution(Size(720, 1280)) // TODO??
         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
 //        .setOutputImageRotationEnabled(true) // TODO what's this??
         .build()
         .also {
             // Sets the analyzer to receive and analyze images.
-            it.setAnalyzer(cameraExecutor, imageAnalyzer)
+            it.setAnalyzer(
+                cameraExecutor,
+                imageAnalyzer
+            ) // cameraxMlKitAnalyzer can be used instead of imageAnalyzer
         }
 
     val imageAspectRatio: Float = imgSize.first.toFloat() / imgSize.second.toFloat()
@@ -98,7 +100,6 @@ fun PoseGraphic(
 
     CameraPreview(
         imageAnalysisBuilder = imageAnalysisBuilder,
-//        cameraExecutor = cameraExecutor, // TODO delete
         context = context,
         lifecycleOwner = lifecycleOwner,
         pose = pose,
@@ -127,13 +128,10 @@ fun CameraPreview(
     postScaleHeightOffset: Float,
     modifier: Modifier
 ) {
-    var lensFacingFront by remember { mutableStateOf(true) }
-    var lensState by remember { mutableStateOf(LENS_FACING_FRONT) }
-
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
 
     Box(contentAlignment = Alignment.BottomCenter, modifier = Modifier.fillMaxSize()) {
-
+        // camera Preview
         AndroidView(
             factory = { ctx ->
                 val previewView = PreviewView(ctx)
@@ -146,7 +144,7 @@ fun CameraPreview(
                     }
 
                     val cameraSelector = CameraSelector.Builder()
-                        .requireLensFacing(lensState)
+                        .requireLensFacing(LENS_FACING_FRONT)
                         .build()
 
                     cameraProvider.unbindAll()
@@ -163,7 +161,7 @@ fun CameraPreview(
             modifier = modifier,
         )
 
-        // draw pose graphic overlay
+        // Pose graphic overlay
         pose?.let {
             PoseGraphicOverlay(
                 pose = pose,
@@ -172,21 +170,5 @@ fun CameraPreview(
                 postScaleHeightOffset = postScaleHeightOffset
             )
         }
-
-        Switch(
-            modifier = Modifier.align(Alignment.TopEnd).padding(5.dp),
-            checked = lensFacingFront,
-            onCheckedChange = {
-                lensFacingFront = it
-                lensState = if (lensFacingFront) LENS_FACING_FRONT else LENS_FACING_BACK
-            },
-            thumbContent = {
-//                Icon(
-//                    imageVector = ImageVector.vectorResource(id = R.drawable.ic_skeleton),
-//                    contentDescription = null,
-//                    modifier = Modifier.size(SwitchDefaults.IconSize),
-//                )
-            }
-        )
     }
 }

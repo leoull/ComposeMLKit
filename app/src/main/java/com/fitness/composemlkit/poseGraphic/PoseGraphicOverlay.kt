@@ -39,8 +39,9 @@ import com.google.mlkit.vision.pose.PoseLandmark.RIGHT_WRIST
 import kotlin.math.absoluteValue
 
 /**
- * @author leoul
  * Draw the detected pose in preview.
+ * Graphic overlay example: https://proandroiddev.com/compose-camerax-on-android-58578f37e6df
+ * Adapted from: https://github1s.com/googlesamples/mlkit/blob/HEAD/android/vision-quickstart/app/src/main/java/com/google/mlkit/vision/demo/kotlin/posedetector/PoseGraphic.kt
  */
 @Composable
 fun PoseGraphicOverlay(
@@ -225,7 +226,6 @@ fun DrawScope.drawPoint(
 }
 
 /**
- * TODO move to shared
  * Adjusts the x coordinate from the image's coordinate system to the view coordinate system.
  */
 fun translateX(
@@ -239,7 +239,6 @@ fun translateX(
 }
 
 /**
- *  * TODO move to shared
  * Adjusts the y coordinate from the image's coordinate system to the view coordinate system.
  */
 fun translateY(

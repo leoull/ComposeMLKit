@@ -18,10 +18,10 @@ import java.util.concurrent.Executors
 
 class MainActivity : ComponentActivity() {
     // designated executor for camera so UI thread doesn't get blocked
-    lateinit var cameraExecutor: ExecutorService
+    private lateinit var cameraExecutor: ExecutorService
 
     // designated executor for classifier so UI thread doesn't get blocked
-    lateinit var classificationExecutor: Executor // TODO delete
+    private lateinit var classificationExecutor: Executor // TODO delete
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,7 +47,6 @@ class MainActivity : ComponentActivity() {
                         classificationExecutor = classificationExecutor,
                         cameraExecutor = cameraExecutor
                     )
-
                 }
             }
         }
